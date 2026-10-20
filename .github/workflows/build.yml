@@ -74,6 +74,8 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [apk, test]
     strategy:
+      # One platform failing still lets the other finish, so a run shows every problem at once.
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
