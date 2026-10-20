@@ -1,0 +1,14 @@
+node_modules/
+out/
+dist/
+resources/launcher.apk
+resources/upstream/
+.DS_Store
+.cytv-build/
+.cytv-data/
+*.tmp
+.env
+*.pem
+*.key
+adbkey
+adbkey.pub
