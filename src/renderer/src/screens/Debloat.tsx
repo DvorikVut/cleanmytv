@@ -278,6 +278,7 @@ export function Debloat({ status, go, markDone }: ScreenProps): ReactNode {
                     </td>
                     <td>
                       <div className="pkg-name">{e.pkg}</div>
+                      {e.choice && <div className="choice-tag">Your choice · {e.choice}</div>}
                       <div className="small muted">
                         {!e.suggested && 'Kept by the list author. '}
                         {e.common > 1 && `Switched off in ${e.common} lists.`}
@@ -374,7 +375,8 @@ export function Debloat({ status, go, markDone }: ScreenProps): ReactNode {
 function defaultTick(e: DebloatEntry): boolean {
   // Keep earlier choices: a package this app switched off stays ticked.
   if (e.state === 'disabled') return e.suggested || e.recorded === 'enabled'
-  return e.suggested && e.state === 'enabled'
+  // Features people use (phone remote, casting, voice) are the user's call, never a default.
+  return e.suggested && e.state === 'enabled' && !e.choice
 }
 
 function StateBadge({ state, recorded, ticked }: { state: PackageState; recorded?: PackageState; ticked: boolean }): ReactNode {

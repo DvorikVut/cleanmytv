@@ -114,7 +114,15 @@ jobs:
           [ "$GITHUB_REF_NAME" = "$WANT" ] || { echo "tag $GITHUB_REF_NAME does not match package.json version $WANT"; exit 1; }
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with: { pattern: CleanMyTV-*, path: dist, merge-multiple: true }
-      # A draft: nothing is public until the owner reviews it and presses Publish.
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --draft --title "CleanMyTV $GITHUB_REF_NAME" --generate-notes --repo "$GITHUB_REPOSITORY"
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      # A draft: nothing is public until the owner reviews it and presses Publish. A release made by hand
+      # for this tag is left as it is.
+      - run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $GITHUB_REF_NAME already exists; leaving it alone"
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --draft --title "CleanMyTV $GITHUB_REF_NAME" --generate-notes --repo "$GITHUB_REPOSITORY"
+          fi
         env:
           GH_TOKEN: ${{ github.token }}

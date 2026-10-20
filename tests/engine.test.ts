@@ -126,8 +126,25 @@ describe('upstream lists', () => {
   it('reads notes and commented-out packages', () => {
     const p = D.parseList('﻿# Header line\r\n# second\r\ncom.a.b   # ads\r\n# com.c.d   # keep this\r\n# Stock launcher: com.e.f\r\n')
     expect(p.header).toEqual(['Header line', 'second'])
-    expect(p.entries).toEqual([{ pkg: 'com.a.b', note: 'ads', suggested: true }, { pkg: 'com.c.d', note: 'keep this', suggested: false }])
+    expect(p.entries).toEqual([{ pkg: 'com.a.b', note: 'ads', suggested: true, section: 'second' }, { pkg: 'com.c.d', note: 'keep this', suggested: false, section: 'second' }])
     expect(() => D.parseList('com.a.b; reboot\n')).toThrow(/not a package name/)
+  })
+
+  it("leaves the owner's choices unticked: personal-choice sections and the phone remote, casting and voice", () => {
+    const text = readFileSync(resolve('resources/upstream/examples/xiaomi-mi-box-s/debloat.txt'), 'utf8')
+    const entries = D.parseList(text).entries
+    const by = (pkg: string) => entries.find((e) => e.pkg === pkg)!
+    // Plain bloat stays a default.
+    expect(D.choiceFor(by('com.mitv.tvhome.atv'))).toBeUndefined()
+    // The section the Mi Box user lost the phone remote to.
+    for (const pkg of ['com.google.android.tv.remote.service', 'com.google.android.apps.mediashell', 'com.mitv.milinkservice', 'com.google.android.katniss']) {
+      expect(D.choiceFor(by(pkg)), pkg).toBeTruthy()
+    }
+    expect(D.choiceFor(by('com.mitv.milinkservice'))).toMatch(/^Personal choice: casting/)
+    expect(D.choiceFor(by('com.google.android.tv.remote.service'))).toMatch(/phone remote/)
+    // Known features are protected even where a list does not label them.
+    expect(D.choiceFor({ pkg: 'com.google.android.tv.remote.service', note: '', suggested: true })).toMatch(/phone remote/)
+    expect(D.choiceFor({ pkg: 'com.vendor.ads', note: '', suggested: true, section: 'Optional: uncomment what you do not use' })).toMatch(/^Optional/)
   })
 
   it('names records the way recovery.py does', () => {

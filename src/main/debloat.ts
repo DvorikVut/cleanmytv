@@ -28,6 +28,8 @@ export interface ListEntry {
   pkg: string
   note: string
   suggested: boolean
+  /** The comment heading the block the package sits in, e.g. "Personal choice: voice assistant". */
+  section?: string
 }
 
 export interface ParsedList {
@@ -44,17 +46,20 @@ export function parseList(text: string, name = 'list'): ParsedList {
   const header: string[] = []
   const entries: ListEntry[] = []
   const seen = new Set<string>()
+  // A blank line ends a block; the last comment line that is not a package heads the block.
+  let section: string | undefined
   const lines = text.replace(/^﻿/, '').split(/\r?\n/)
   lines.forEach((raw, i) => {
     const line = raw.trim()
-    if (!line) return
+    if (!line) { section = undefined; return }
     if (line.startsWith('#')) {
       const body = line.replace(/^#+\s*/, '')
       const m = /^(\S+)\s*(?:#\s*(.*))?$/.exec(body)
       if (m && T.PACKAGE_RE.test(m[1])) {
-        if (!seen.has(m[1])) { seen.add(m[1]); entries.push({ pkg: m[1], note: (m[2] ?? '').trim(), suggested: false }) }
-      } else if (!entries.length) {
-        header.push(body)
+        if (!seen.has(m[1])) { seen.add(m[1]); entries.push({ pkg: m[1], note: (m[2] ?? '').trim(), suggested: false, section }) }
+      } else {
+        if (!entries.length) header.push(body)
+        if (body) section = body
       }
       return
     }
@@ -66,7 +71,7 @@ export function parseList(text: string, name = 'list'): ParsedList {
     const existing = entries.find((e) => e.pkg === pkg)
     if (existing) { existing.suggested = true; return }
     seen.add(pkg)
-    entries.push({ pkg, note, suggested: true })
+    entries.push({ pkg, note, suggested: true, section })
   })
   return { header, entries }
 }
@@ -356,6 +361,22 @@ export function restoreCommands(listPackages: string[], record: RecoveryRecord |
 
 // ---- plan, apply, restore -------------------------------------------------------------------------
 
+// Features people notice when they are gone. Whatever a list says, these are the owner's call: they are
+// never ticked by default (upstream's prompt asks about them before anything is disabled).
+const FEATURES: Record<string, string> = {
+  'com.google.android.tv.remote.service': 'the phone remote (Google TV / Android TV Remote app)',
+  'com.google.android.apps.mediashell': 'casting from phones (Chromecast built-in)',
+  'com.google.android.katniss': 'voice search and the remote\'s mic button',
+  'com.google.android.speech.pumpkin': 'voice search and the remote\'s mic button'
+}
+
+/** Why a package is the owner's decision rather than a default, or undefined when it is plain bloat. */
+export function choiceFor(e: ListEntry): string | undefined {
+  if (FEATURES[e.pkg]) return `Turns off ${FEATURES[e.pkg]}.`
+  if (e.section && /^(personal choice|optional)\b/i.test(e.section)) return e.section
+  return undefined
+}
+
 function sourceList(listId: string): { title: string; parsed: ParsedList } {
   if (listId === 'custom') {
     const entries = [...commonality().entries()]
@@ -392,7 +413,8 @@ export async function plan(listId: string): Promise<DebloatPlan> {
     suggested: e.suggested,
     state: stateOf(e.pkg, installed, disabled),
     recorded: record?.packages[e.pkg],
-    common: common.get(e.pkg)?.count ?? 0
+    common: common.get(e.pkg)?.count ?? 0,
+    choice: choiceFor(e)
   }))
   // The custom list is every package other TVs disable: only the ones on this TV are worth showing.
   if (listId === 'custom') entries = entries.filter((e) => e.state !== 'absent')

@@ -72,6 +72,11 @@ export interface DebloatEntry {
   recorded?: PackageState
   /** How many of the upstream lists disable this package. */
   common: number
+  /**
+   * Set when switching this package off loses something people use (the phone remote, casting, voice)
+   * or the list puts it under "Personal choice"/"Optional": not ticked unless the user ticks it.
+   */
+  choice?: string
 }
 
 export interface DebloatPlan {
