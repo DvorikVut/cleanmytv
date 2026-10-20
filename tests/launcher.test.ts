@@ -1,4 +1,5 @@
-import { mkdtempSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
@@ -11,7 +12,14 @@ import { FakeTv, newTv, startFakeAdbd } from './fake-adbd'
 
 const home = mkdtempSync(join(tmpdir(), 'cytv-test-'))
 process.env.HOME = home
-configurePaths(resolve('resources'), join(home, 'data'))
+// A resources folder of its own: the real lists and themes, and a stand-in APK, so this runs without
+// the launcher having been built (CI builds it in a separate job).
+const resources = join(home, 'resources')
+mkdirSync(resources)
+symlinkSync(resolve('resources/upstream'), join(resources, 'upstream'))
+writeFileSync(join(resources, 'launcher.apk'), randomBytes(200 * 1024))
+writeFileSync(join(resources, 'launcher.json'), JSON.stringify({ versionName: '2.4' }))
+configurePaths(resources, join(home, 'data'))
 
 describe('launcher and theme', () => {
   let tv: FakeTv

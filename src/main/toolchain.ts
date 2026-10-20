@@ -91,13 +91,18 @@ async function download(tool: ToolId, url: string, file: string): Promise<void> 
   progress({ tool, received, total, phase: 'download' })
 }
 
-/** tar reads .zip and .tar.gz on macOS, Linux and Windows 10 and later. */
+/**
+ * bsdtar (macOS, Windows 10 and later) reads .zip and .tar.gz; GNU tar on Linux reads only tar, so
+ * zips go to unzip there.
+ */
 async function extract(tool: ToolId, archive: string, into: string): Promise<void> {
   progress({ tool, received: 0, total: 0, phase: 'extract' })
   mkdirSync(into, { recursive: true })
   // Windows' own bsdtar, not a GNU tar from Git that reads "C:" as a remote host.
   const tar = win ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar'
-  const r = await run('download', tar, ['-xf', archive, '-C', into], { quiet: true })
+  const r = process.platform === 'linux' && archive.endsWith('.zip')
+    ? await run('download', 'unzip', ['-q', '-o', archive, '-d', into], { quiet: true })
+    : await run('download', tar, ['-xf', archive, '-C', into], { quiet: true })
   if (r.code !== 0) throw new Error(`could not unpack ${archive}: ${r.out.trim()}`)
   rmSync(archive, { force: true })
 }
