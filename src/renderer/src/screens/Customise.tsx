@@ -6,6 +6,7 @@ import { TvPreview } from '../components/TvPreview'
 import { Busy, Confirm, Modal, ResultNotice, Slider, Toggle, errorText } from '../components/ui'
 import { BUILTIN, orderedApps, val } from '../lib/apps'
 import { dataUrlToImage, prepareWallpaper, uniqueNames, type PreparedImage } from '../lib/image'
+import { fetchBingDaily, tmdbBackdropPaths, fetchTmdbBackdrop } from '../lib/backgrounds'
 
 type Tab = 'apps' | 'layout' | 'backdrop' | 'greeting' | 'motion' | 'advanced'
 type WallChange = { kind: 'keep' } | { kind: 'remove' } | { kind: 'set'; image: PreparedImage }
@@ -337,6 +338,56 @@ function BackdropTab(props: {
   const [working, setWorking] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const rotationMinutes = val(cfg, 'wallpaper_rotation_minutes')
+  const [tmdbKey, setTmdbKey] = useState('')
+  const [tmdbList, setTmdbList] = useState('')
+
+  /** Appends prepared images to the rotation set (issue #5 sources funnel in here). */
+  function addToRotation(images: PreparedImage[]): void {
+    const out = props.rotation.kind === 'set' ? [...props.rotation.images, ...images] : images
+    props.setRotation({ kind: 'set', images: uniqueNames(out).slice(0, 100) })
+    set('wallpaper', true)
+    if (!rotationMinutes) set('wallpaper_rotation_minutes', 30)
+  }
+
+  async function addBing(): Promise<void> {
+    setErr(null)
+    setWorking('Fetching the Bing picture of the day')
+    try {
+      addToRotation([await fetchBingDaily()])
+    } catch (e) {
+      setErr(`The Bing picture could not be fetched: ${errorText(e)}`)
+    } finally {
+      setWorking(null)
+    }
+  }
+
+  async function addTmdb(): Promise<void> {
+    const key = tmdbKey.trim()
+    const list = Number(tmdbList.trim())
+    setErr(null)
+    if (!key || !Number.isInteger(list) || list <= 0) {
+      setErr('Enter your TMDB API key and a list number (digits only, from themoviedb.org/list/…).')
+      return
+    }
+    setWorking('Fetching movie backdrops from TMDB')
+    try {
+      const paths = (await tmdbBackdropPaths(list, key)).slice(0, 20)
+      if (!paths.length) {
+        setErr('That TMDB list has no backdrops to use.')
+        return
+      }
+      const images: PreparedImage[] = []
+      for (let i = 0; i < paths.length; i++) {
+        setWorking(`Fetching backdrop ${i + 1} of ${paths.length}`)
+        images.push(await fetchTmdbBackdrop(paths[i]))
+      }
+      addToRotation(images)
+    } catch (e) {
+      setErr(`TMDB could not be used: ${errorText(e)}`)
+    } finally {
+      setWorking(null)
+    }
+  }
 
   async function pickSingle(files: FileList | null): Promise<void> {
     if (!files?.[0]) return
@@ -503,6 +554,44 @@ function BackdropTab(props: {
               ))}
           </select>
         </label>
+
+        <div style={{ marginTop: 16 }}>
+          <h4 style={{ marginBottom: 4 }}>Get pictures</h4>
+          <p className="muted small">
+            Fetched on this computer, resized for the TV and added to the rotation above. Nothing is fetched on the TV and
+            no keys are sent to it.
+          </p>
+          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+            <button className="btn small" onClick={() => addBing()} disabled={!!working}>
+              Bing picture of the day
+            </button>
+            <button className="btn small" onClick={() => addTmdb()} disabled={!!working}>
+              TMDB backdrops
+            </button>
+          </div>
+          <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
+            <input
+              type="password"
+              value={tmdbKey}
+              onChange={(e) => setTmdbKey(e.target.value)}
+              placeholder="TMDB API key (v3)"
+              style={{ width: 220 }}
+              autoComplete="off"
+            />
+            <input
+              type="text"
+              value={tmdbList}
+              onChange={(e) => setTmdbList(e.target.value.replace(/[^0-9]/g, ''))}
+              placeholder="List number, e.g. 28"
+              style={{ width: 150 }}
+              inputMode="numeric"
+            />
+          </div>
+          <p className="muted small" style={{ marginTop: 6 }}>
+            The key stays in this window and is never saved or sent to the TV. Create a free key at themoviedb.org; the
+            list number is the digits at the end of a themoviedb.org/list/… address.
+          </p>
+        </div>
       </div>
 
       <Slider
