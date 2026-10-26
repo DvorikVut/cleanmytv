@@ -4,6 +4,9 @@ A Mac and Windows app for [cleanyourtv](https://github.com/Gathin23/cleanyourtv)
 [@gathint](https://x.com/gathint). It debloats an Android TV, installs the clean launcher and lets you
 customise it, without Python, Java, Android Studio or `adb` on your computer.
 
+New to this? The **[user guide](docs/USER-GUIDE.md)** walks every step at TV-owner pace, including
+rollback and troubleshooting. This README is the technical overview.
+
 This is an independent project, not part of cleanyourtv. The debloat lists, themes and launcher come
 from upstream unchanged; this app is the desktop front end for them. Tested on a Xiaomi Mi Box S from
 Windows.
